@@ -15,7 +15,7 @@ pipeline {
         }
         stage ("Git Checkout") {
             steps {
-                git 'https://github.com/KastroVKiran/Zomato-Project-Kastro.git'
+                git 'https://github.com/ishanpathak98/DevOps-Project-Zomato.git'
             }
         }
         stage("Sonarqube Analysis"){
