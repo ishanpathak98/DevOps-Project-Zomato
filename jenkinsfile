@@ -15,7 +15,7 @@ pipeline {
         }
         stage ("Git Checkout") {
             steps {
-                git 'https://github.com/KastroVKiran/Zomato-Project-Kastro.git'
+                git 'https://github.com/ishanpathak98/DevOps-Project-Zomato.git'
             }
         }
         stage("Sonarqube Analysis"){
@@ -58,8 +58,8 @@ pipeline {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'docker') {
-                        sh "docker tag zomato kastrov/zomato:latest "
-                        sh "docker push kastrov/zomato:latest "
+                        sh "docker tag zomato ishanpathak98/zomato:latest "
+                        sh "docker push ishanpathak98/zomato:latest "
                     }
                 }
             }
@@ -100,7 +100,7 @@ pipeline {
                 </body>
                 </html>
             """,
-            to: 'kastrokiran@gmail.com',
+            to: 'ishaanpathak94@gmail.com',
             mimeType: 'text/html',
             attachmentsPattern: 'trivy.txt'
         }
