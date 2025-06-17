@@ -32,7 +32,7 @@ pipeline {
         stage('Clean Workspace') {
             steps {
                 script {
-                    echo "Cleaning workspace..."
+                    echo "🧹 Cleaning workspace..."
                     cleanWs()
                 }
             }
@@ -41,11 +41,28 @@ pipeline {
         stage('Git Checkout') {
             steps {
                 script {
-                    echo "Checking out source code..."
+                    echo "📥 Checking out source code..."
                     try {
-                        checkout scm
+                        git branch: 'master', 
+                            url: 'https://github.com/ishanpathak98/DevOps-Project-Zomato.git'
+                        
+                        // Get commit information for build metadata
+                        env.GIT_COMMIT = sh(
+                            script: 'git rev-parse HEAD',
+                            returnStdout: true
+                        ).trim()
+                        
+                        env.GIT_BRANCH = sh(
+                            script: 'git rev-parse --abbrev-ref HEAD',
+                            returnStdout: true
+                        ).trim()
+                        
+                        echo "✅ Git checkout completed"
+                        echo "📋 Commit: ${env.GIT_COMMIT}"
+                        echo "🌿 Branch: ${env.GIT_BRANCH}"
+                        
                     } catch (Exception e) {
-                        error "Git checkout failed: ${e.getMessage()}"
+                        error "❌ Git checkout failed: ${e.getMessage()}"
                     }
                 }
             }
@@ -54,7 +71,7 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    echo "Running SonarQube Analysis..."
+                    echo "🔍 Running SonarQube Analysis..."
                     try {
                         withSonarQubeEnv('sonar-server') {
                             sh """
@@ -66,7 +83,7 @@ pipeline {
                             """
                         }
                     } catch (Exception e) {
-                        error "SonarQube analysis failed: ${e.getMessage()}"
+                        error "❌ SonarQube analysis failed: ${e.getMessage()}"
                     }
                 }
             }
@@ -75,20 +92,20 @@ pipeline {
         stage('Code Quality Gate') {
             steps {
                 script {
-                    echo "Waiting for Quality Gate results..."
+                    echo "🎯 Waiting for Quality Gate results..."
                     try {
                         timeout(time: 5, unit: 'MINUTES') {
                             def qg = waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token'
                             if (qg.status != 'OK') {
-                                echo "Quality Gate status: ${qg.status}"
+                                echo "⚠️  Quality Gate status: ${qg.status}"
                                 // Continue build but mark as unstable
                                 currentBuild.result = 'UNSTABLE'
                             } else {
-                                echo "Quality Gate passed!"
+                                echo "✅ Quality Gate passed!"
                             }
                         }
                     } catch (Exception e) {
-                        echo "Quality Gate timeout or error: ${e.getMessage()}"
+                        echo "⚠️  Quality Gate timeout or error: ${e.getMessage()}"
                         currentBuild.result = 'UNSTABLE'
                     }
                 }
@@ -98,7 +115,7 @@ pipeline {
         stage('Install NPM Dependencies') {
             steps {
                 script {
-                    echo "Installing NPM dependencies..."
+                    echo "📦 Installing NPM dependencies..."
                     try {
                         // Check if package.json exists
                         if (fileExists('package.json')) {
@@ -108,10 +125,10 @@ pipeline {
                                 npm ci --only=production --no-audit --no-fund
                             """
                         } else {
-                            echo "No package.json found, skipping NPM install"
+                            echo "⚠️  No package.json found, skipping NPM install"
                         }
                     } catch (Exception e) {
-                        error "NPM installation failed: ${e.getMessage()}"
+                        error "❌ NPM installation failed: ${e.getMessage()}"
                     }
                 }
             }
@@ -120,7 +137,7 @@ pipeline {
         stage('OWASP Dependency Check') {
             steps {
                 script {
-                    echo "Running OWASP Dependency Check..."
+                    echo "🛡️  Running OWASP Dependency Check..."
                     try {
                         dependencyCheck additionalArguments: '''
                             --scan ./
@@ -138,7 +155,7 @@ pipeline {
                             archiveArtifacts artifacts: 'dependency-check-report.html', fingerprint: true
                         }
                     } catch (Exception e) {
-                        echo "OWASP Dependency Check failed: ${e.getMessage()}"
+                        echo "⚠️  OWASP Dependency Check failed: ${e.getMessage()}"
                         currentBuild.result = 'UNSTABLE'
                     }
                 }
@@ -148,7 +165,7 @@ pipeline {
         stage('Trivy File System Scan') {
             steps {
                 script {
-                    echo "Running Trivy File System scan..."
+                    echo "🔒 Running Trivy File System scan..."
                     try {
                         sh """
                             # Check if trivy is installed
@@ -176,7 +193,7 @@ pipeline {
                         archiveArtifacts artifacts: 'trivy-fs-report.txt', fingerprint: true
                         
                     } catch (Exception e) {
-                        echo "Trivy scan failed: ${e.getMessage()}"
+                        echo "⚠️  Trivy scan failed: ${e.getMessage()}"
                         currentBuild.result = 'UNSTABLE'
                     }
                 }
@@ -186,30 +203,31 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    echo "Building Docker image..."
+                    echo "🐳 Building Docker image..."
                     try {
                         // Check if Dockerfile exists
                         if (!fileExists('Dockerfile')) {
-                            error "Dockerfile not found in the repository"
+                            error "❌ Dockerfile not found in the repository"
                         }
                         
-                        sh """
-                            # Build the image with build args and labels
-                            docker build \
-                                --build-arg BUILD_DATE=\$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
-                                --build-arg VCS_REF=\$(git rev-parse HEAD) \
-                                --build-arg BUILD_NUMBER=${env.BUILD_NUMBER} \
-                                --label "build.number=${env.BUILD_NUMBER}" \
-                                --label "build.url=${env.BUILD_URL}" \
-                                --label "git.commit=\$(git rev-parse HEAD)" \
-                                -t ${DOCKER_IMAGE_NAME}:${env.BUILD_NUMBER} \
-                                -t ${DOCKER_IMAGE_NAME}:latest .
-                        """
+                            sh """
+                                # Build the image with build args and labels
+                                docker build \
+                                    --build-arg BUILD_DATE=\$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+                                    --build-arg VCS_REF=${env.GIT_COMMIT} \
+                                    --build-arg BUILD_NUMBER=${env.BUILD_NUMBER} \
+                                    --label "build.number=${env.BUILD_NUMBER}" \
+                                    --label "build.url=${env.BUILD_URL}" \
+                                    --label "git.commit=${env.GIT_COMMIT}" \
+                                    --label "git.branch=${env.GIT_BRANCH}" \
+                                    -t ${DOCKER_IMAGE_NAME}:${env.BUILD_NUMBER} \
+                                    -t ${DOCKER_IMAGE_NAME}:latest .
+                            """
                         
-                        echo "Docker image built successfully"
+                        echo "✅ Docker image built successfully"
                         
                     } catch (Exception e) {
-                        error "Docker build failed: ${e.getMessage()}"
+                        error "❌ Docker build failed: ${e.getMessage()}"
                     }
                 }
             }
@@ -218,7 +236,7 @@ pipeline {
         stage('Tag & Push to DockerHub') {
             steps {
                 script {
-                    echo "Tagging and pushing to DockerHub..."
+                    echo "🚀 Tagging and pushing to DockerHub..."
                     try {
                         withDockerRegistry(credentialsId: 'docker') {
                             sh """
@@ -230,11 +248,11 @@ pipeline {
                                 docker push ${DOCKER_REGISTRY_USER}/${DOCKER_IMAGE_NAME}:latest
                                 docker push ${DOCKER_REGISTRY_USER}/${DOCKER_IMAGE_NAME}:${env.BUILD_NUMBER}
                                 
-                                echo "Images pushed successfully"
+                                echo "✅ Images pushed successfully"
                             """
                         }
                     } catch (Exception e) {
-                        error "Docker push failed: ${e.getMessage()}"
+                        error "❌ Docker push failed: ${e.getMessage()}"
                     }
                 }
             }
@@ -243,7 +261,7 @@ pipeline {
         stage('Docker Security Scan') {
             steps {
                 script {
-                    echo "Running Docker security scan..."
+                    echo "🔍 Running Docker security scan..."
                     try {
                         withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
                             sh """
@@ -276,7 +294,7 @@ pipeline {
                         }
                         
                     } catch (Exception e) {
-                        echo "Docker security scan failed: ${e.getMessage()}"
+                        echo "⚠️  Docker security scan failed: ${e.getMessage()}"
                         currentBuild.result = 'UNSTABLE'
                     }
                 }
@@ -286,7 +304,7 @@ pipeline {
         stage('Deploy to Container') {
             steps {
                 script {
-                    echo "Deploying to container..."
+                    echo "🚀 Deploying to container..."
                     try {
                         sh """
                             # Stop and remove existing container if it exists
@@ -312,16 +330,16 @@ pipeline {
                             # Wait for container to be healthy
                             echo "Waiting for container to be healthy..."
                             timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ${CONTAINER_NAME} | grep -q "healthy"; do sleep 5; done' || {
-                                echo "Container health check timeout"
+                                echo "⚠️  Container health check timeout"
                                 docker logs ${CONTAINER_NAME}
                             }
                             
-                            echo "Container deployed successfully"
+                            echo "✅ Container deployed successfully"
                             docker ps | grep ${CONTAINER_NAME}
                         """
                         
                     } catch (Exception e) {
-                        error "Deployment failed: ${e.getMessage()}"
+                        error "❌ Deployment failed: ${e.getMessage()}"
                     }
                 }
             }
@@ -330,7 +348,7 @@ pipeline {
         stage('Post-Deploy Verification') {
             steps {
                 script {
-                    echo "Running post-deployment verification..."
+                    echo "✅ Running post-deployment verification..."
                     try {
                         sh """
                             # Wait a bit for the application to fully start
@@ -338,17 +356,17 @@ pipeline {
                             
                             # Check if application is responding
                             curl -f http://localhost:${APP_PORT} || {
-                                echo "Application health check failed"
+                                echo "❌ Application health check failed"
                                 docker logs ${CONTAINER_NAME}
                                 exit 1
                             }
                             
-                            echo "Application is responding correctly"
-                            echo "Deployment completed successfully!"
-                            echo "Application URL: http://localhost:${APP_PORT}"
+                            echo "✅ Application is responding correctly"
+                            echo "🌟 Deployment completed successfully!"
+                            echo "📱 Application URL: http://localhost:${APP_PORT}"
                         """
                     } catch (Exception e) {
-                        error "Post-deployment verification failed: ${e.getMessage()}"
+                        error "❌ Post-deployment verification failed: ${e.getMessage()}"
                     }
                 }
             }
@@ -376,7 +394,7 @@ pipeline {
                 
                 emailext (
                     attachLog: true,
-                    subject: "${env.JOB_NAME} - Build #${env.BUILD_NUMBER} - ${currentBuild.result ?: 'SUCCESS'}",
+                    subject: "🚀 ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} - ${currentBuild.result ?: 'SUCCESS'}",
                     body: """
                         <html>
                         <head>
@@ -408,7 +426,8 @@ pipeline {
                                 <table>
                                     <tr><th>Build Number</th><td>${env.BUILD_NUMBER}</td></tr>
                                     <tr><th>Build URL</th><td><a href="${env.BUILD_URL}">${env.BUILD_URL}</a></td></tr>
-                                    <tr><th>Git Branch</th><td>${env.BRANCH_NAME ?: 'main'}</td></tr>
+                                    <tr><th>Git Branch</th><td>${env.GIT_BRANCH ?: 'master'}</td></tr>
+                                    <tr><th>Git Commit</th><td>${env.GIT_COMMIT ?: 'N/A'}</td></tr>
                                     <tr><th>Build Duration</th><td>${currentBuild.durationString}</td></tr>
                                     <tr><th>Docker Image</th><td>${DOCKER_REGISTRY_USER}/${DOCKER_IMAGE_NAME}:${env.BUILD_NUMBER}</td></tr>
                                 </table>
@@ -439,20 +458,20 @@ pipeline {
         }
         
         success {
-            echo "Pipeline completed successfully!"
+            echo "🎉 Pipeline completed successfully!"
         }
         
         failure {
-            echo "Pipeline failed. Check the logs for details."
+            echo "❌ Pipeline failed. Check the logs for details."
             // Additional failure handling can be added here
         }
         
         unstable {
-            echo "Pipeline completed with warnings. Some non-critical steps failed."
+            echo "⚠️  Pipeline completed with warnings. Some non-critical steps failed."
         }
         
         cleanup {
-            echo "Performing cleanup..."
+            echo "🧹 Performing cleanup..."
             // Additional cleanup steps can be added here
         }
     }
